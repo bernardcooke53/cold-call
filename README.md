@@ -35,11 +35,12 @@ and call that function using the _keys_ which match the corresponding _parameter
 names of the function to provide values. For example:
 
 ```python
-
 from cold_call import cold_call
+
 
 def func(a: int, b: str) -> None:
     print(a, b)
+
 
 data = {"a": 5, "b": "foo"}
 
@@ -88,14 +89,11 @@ foo({
 def foo(name: str, age: int) -> None:
     print(f"{name}: {age}")
 
+
 # prints "Joe: 30"
 cold_call(
     foo,
-    dct={
-        "name": "Joe",
-        "age": 30,
-        "birthday": "01/06/1990"
-    },
+    dct={"name": "Joe", "age": 30, "birthday": "01/06/1990"},
 )
 ```
 
@@ -107,12 +105,9 @@ used in preference to those found in the `dict`:
 def foo(name: str, age: int) -> None:
     print(f"{name}: {age}")
 
+
 # prints "Joe: 42"
-cold_call(
-    foo,
-    dct={"name": "Joe", "age": 21},
-    age=42
-)
+cold_call(foo, dct={"name": "Joe", "age": 21}, age=42)
 ```
 
 `cold_call` also works with functions that have more specific signatures:
@@ -127,6 +122,7 @@ def picky(
 ) -> int:
     print(f"{a=}, {b=}, {c=}")
     return b * 2
+
 
 # prints "a=gotcha, b=5, c=False"
 x = cold_call(
@@ -149,8 +145,10 @@ from dataclasses import dataclass
 
 from cold_call import ColdCaller
 
+
 def user_action(name: str) -> None:
     print(f"user {name} is doing things!")
+
 
 def is_authorized(name: str, is_admin: bool) -> bool:
     if not is_admin:
