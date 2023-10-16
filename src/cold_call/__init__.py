@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
-from copy import copy
 from dataclasses import asdict, dataclass
 from functools import wraps
 from inspect import Parameter, signature
+from itertools import groupby
 from typing import Any, Callable, TypeVar
+
+__version__ = "0.0.1"
 
 log = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -14,7 +16,6 @@ T = TypeVar("T")
 def cold_call(
     func: Callable[..., T],
     *a: Any,
-    dct: dict[str, Any],
     __follow_wrapped: bool = True,
     **kw: Any,
 ) -> T:
@@ -25,60 +26,139 @@ def cold_call(
     >>> def func(foo, arg2=False):
     ...     print(foo, arg2)
     ...
-    >>> cold_call(foo, dct=d)
+    >>> cold_call(foo, **d)
     bar True
     """
-    # N.B. in this implementation, *a are always supplied positionally before any
-    # keyword arguments. This means you can't specify the value for the first
-    # positional parameter in dct and collect other parameters via *a for example
-    # - positional parameters should use *a or can be given in dct if *a is not used.
-
-    # Take a shallow copy of dct to avoid mutating the original dict -
-    # otherwise popping keys could affect usage elsewhere.
-    # Doing a deep copy might be unexpected behaviour as user might expect the
-    # same instances to be passed into multiple functions
     log.debug("Binding arguments for %r", func.__qualname__)
 
-    tmp_kw = copy(dct)
-    tmp_kw.update(kw)
-
-    log.debug(
-        "Binding arguments for %r: args - %s, kwargs - %s",
-        func.__qualname__,
-        str(a),
-        str(tmp_kw),
-    )
     sig = signature(func, follow_wrapped=__follow_wrapped)
-    var_kwarg_name: Parameter | None = None
-    permitted_kwargs: dict[str, Any] = {}
 
-    for name, param in sig.parameters.items():
-        if param.kind == Parameter.VAR_KEYWORD:
-            # If we have a VAR_KEYWORD arg, we have to put all the non-named parameters
-            # into it. So let's see what's left over at the end and bind it to that.
-            var_kwarg_name = param
-            continue
-        if name in tmp_kw:
-            # Use pop so that we know any remaining extra kwargs
-            # can be put into the var_kwarg parameter at the end,
-            # if there is one
-            permitted_kwargs[name] = tmp_kw.pop(name)
+    grouped_by_kind = {
+        kind: dict(items)
+        for kind, items in groupby(sig.parameters.items(), lambda p: p[1].kind)
+    }
 
-    if var_kwarg_name is not None:
-        # If we're allowed var_kwargs then we should give as many as possible -
-        # all the left over parameters that haven't been popped go here
-        permitted_kwargs.update(tmp_kw)
+    # If we have a VAR_KEYWORD arg, we have to put all the non-named parameters
+    # into it. So let's see what's left over at the end and bind it to that.
+    posonly_args = grouped_by_kind.get(Parameter.POSITIONAL_ONLY)
+    pos_or_kwargs = grouped_by_kind.get(Parameter.POSITIONAL_OR_KEYWORD)
+    var_posarg = grouped_by_kind.get(Parameter.VAR_POSITIONAL)
+    grouped_by_kind.get(Parameter.KEYWORD_ONLY)
+    var_kwarg = grouped_by_kind.get(Parameter.VAR_KEYWORD)
 
-    bound = sig.bind_partial(*a, **permitted_kwargs)
+    ######
+    # Positional-only arguments
+
+    # For positional-only args, the following precedence applies:
+    #    1) Any named arguments passed as keyword-arguments which
+    #       match the param names of positional-only arguments are
+    #       passed there
+    #    2) Any arguments passed positionally are used to fill the
+    #       remaining positional arguments, until they're all filled
+    #    3) Leftover arguments are ignored if there's no VAR_POSITIONAL
+    #       argument, or passed into this VAR_POSITIONAL argument
+    #
+    # Therefore the main logic here is to find any "known" posargs and their indices,
+    # and ensure that the others are populated from the positional arguments.
+    ######
+
+    args: list[Any] = []
+    passed_posargs = list(a)
+
+    if posonly_args:
+        for index, name in enumerate(posonly_args):
+            if name in kw:
+                args.append(kw[name])
+            elif passed_posargs:
+                value, *passed_posargs = passed_posargs
+                args.append(value)
+            else:
+                # no more positional arguments given
+                # NOTE: this is _almost_ identical to how the inbuilt errors for missing
+                # arguments are reported to the user, but this indicates if positional
+                # arguments are missing when others have been filled by keyword
+                # arguments.
+
+                # For example:
+                # def f(arg1, arg2): pass  # noqa: ERA001
+                #
+                # if we were to call cold_call(f, arg2=5), the inbuilt error would be
+                # TypeError("f() missing 1 required positional argument: 'arg2'")  # noqa: ERA001,E501
+                # But of course the user _has_ supplied arg2, it's arg1 that's missing.
+                # Our error is:
+                # TypeError("f() missing 1 required positional argument: 'arg1'")  # noqa: ERA001,E501
+
+                unfilled_posargs = list(posonly_args)[index:]
+                one_missing = len(unfilled_posargs) == 1
+
+                msg = (
+                    f"{func.__qualname__}() missing {len(unfilled_posargs)} required "
+                    + (
+                        f"positional argument: {unfilled_posargs[0]!r}"
+                        if one_missing
+                        else f"positional arguments: {', '.join(repr(name) for name in unfilled_posargs[:-1])} "
+                        f"and {unfilled_posargs[-1]!r}"
+                    )
+                )
+                raise TypeError(msg)
+
+    #####
+    # Positional-or-keyword arguments
+    # Find any that we can from the keyword arguments, and fill in the rest
+    # from the positional arguments.
+    # If a parameter can be passed positionally or by keyword,
+    # we prefer to pass it positionally as otherwise we can get
+    # 'multiple values' for parameter
+    #####
+    if pos_or_kwargs:
+        for index, name in enumerate(pos_or_kwargs):
+            if name in kw:
+                # if we can supply by keyword then we will
+                args.append(kw[name])
+            elif passed_posargs:
+                value, *passed_posargs = passed_posargs
+                args.append(value)
+            else:
+                # no more positional arguments given
+                # similar to posonly_args above
+                unfilled_pos_or_kwargs = list(pos_or_kwargs)[index:]
+                one_missing = len(unfilled_pos_or_kwargs) == 1
+                msg = (
+                    f"{func.__qualname__}() missing {len(unfilled_pos_or_kwargs)} required "
+                    + (
+                        f"positional argument: {unfilled_pos_or_kwargs[0]!r}"
+                        if one_missing
+                        else f"positional arguments: {', '.join(repr(name) for name in unfilled_pos_or_kwargs[:-1])} "
+                        f"and {unfilled_pos_or_kwargs[-1]!r}"
+                    )
+                )
+                raise TypeError(msg)
+
+    #####
+    # Variadic positional argument
+    #####
+    if var_posarg:
+        args.extend(passed_posargs)
+    #####
+    # Keyword-only arguments
+    #####
+    kwargs = {
+        name: kw[name]
+        for name in grouped_by_kind.get(Parameter.KEYWORD_ONLY, {})
+        if name in kw
+    }
+    #####
+    # Variadic Keyword arguments
+    #####
+    if var_kwarg:
+        kwargs[var_kwarg.popitem()[0]] = {
+            name: value for name, value in kw.items() if name not in kwargs
+        }
+
+    bound = sig.bind_partial(*args, **kwargs)
     bound.apply_defaults()
 
-    log.debug(
-        "Bound args %s and kwargs %s for function %r",
-        str(bound.args),
-        str(bound.kwargs),
-        func.__qualname__,
-    )
-    # if param can be pos or kw, pos preferred so needs args anyway
+    log.debug("Bound args and kwargs for function %r", func.__qualname__)
     return func(*bound.args, **bound.kwargs)
 
 
@@ -114,4 +194,4 @@ class ColdCaller:
         >>> s.call(func, param3 = False)
         foo True False
         """
-        return cold_call(func, *a, dct=asdict(self), **kw)
+        return cold_call(func, *a, **{**asdict(self), **kw})

@@ -30,7 +30,7 @@ Issues = "https://github.com/bernardcooke53/cold-call/issues"
 Source = "https://github.com/bernardcooke53/cold-call"
 
 [tool.hatch.version]
-path = "src/cold_call/__about__.py"
+path = "src/cold_call/__init__.py"
 
 [tool.hatch.envs.default]
 dependencies = [
