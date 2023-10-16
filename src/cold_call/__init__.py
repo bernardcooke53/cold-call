@@ -72,6 +72,8 @@ def cold_call(
             elif passed_posargs:
                 value, *passed_posargs = passed_posargs
                 args.append(value)
+            elif (default := posonly_args[name].default) is not Parameter.empty:
+                args.append(default)
             else:
                 # no more positional arguments given
                 # NOTE: this is _almost_ identical to how the inbuilt errors for missing
@@ -118,6 +120,8 @@ def cold_call(
             elif passed_posargs:
                 value, *passed_posargs = passed_posargs
                 args.append(value)
+            elif (default := pos_or_kwargs[name].default) is not Parameter.empty:
+                args.append(default)
             else:
                 # no more positional arguments given
                 # similar to posonly_args above
@@ -151,14 +155,13 @@ def cold_call(
     # Variadic Keyword arguments
     #####
     if var_kwarg:
-        kwargs[var_kwarg.popitem()[0]] = {
-            name: value for name, value in kw.items() if name not in kwargs
-        }
+        kwargs.update({name: value for name, value in kw.items() if name not in kwargs})
 
     bound = sig.bind_partial(*args, **kwargs)
     bound.apply_defaults()
 
     log.debug("Bound args and kwargs for function %r", func.__qualname__)
+
     return func(*bound.args, **bound.kwargs)
 
 
@@ -179,7 +182,7 @@ class ColdCaller:
 
     def call(self, func: Callable[..., T], *a: Any, **kw: Any) -> T:
         """
-        This method uses cold_call with `self` as the input dict of params.
+        This method uses cold_call with `self` as the input kwargs.
         E.g.
         >>> @dataclass
         ... class MyState(ColdCaller):
@@ -193,5 +196,8 @@ class ColdCaller:
         ...     print(foo, param2, param3)
         >>> s.call(func, param3 = False)
         foo True False
+
+        Note that this means positional arguments to this method will
+        be overridden by dataclass fields on `self`.
         """
         return cold_call(func, *a, **{**asdict(self), **kw})
