@@ -134,15 +134,11 @@ are used to fill `*args`, and any "left over" keyword arguments are used
 to fill `**kwargs`:
 
 ```python
-def foo(
-    name: str,
-    *meals: str,
-    age: int,
-    **attrs
-) -> None:
+def foo(name: str, *meals: str, age: int, **attrs) -> None:
     print(f"{name}, age: {age}")
     print(f"likes: {', '.join(meals)}")
     print(attrs)
+
 
 # prints:
 # Joe, 42
@@ -158,7 +154,6 @@ cold_call(
     city="London",
     age=42,
 )
-
 ```
 
 `cold_call` also works with functions that have more specific signatures:

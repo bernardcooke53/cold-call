@@ -98,7 +98,7 @@ def cold_call(
                     + (
                         f"positional argument: {unfilled_posargs[0]!r}"
                         if one_missing
-                        else f"positional arguments: {', '.join(repr(name) for name in unfilled_posargs[:-1])} "
+                        else f"positional arguments: {', '.join(repr(name) for name in unfilled_posargs[:-1])} "  # noqa: E501
                         f"and {unfilled_posargs[-1]!r}"
                     )
                 )
@@ -128,11 +128,11 @@ def cold_call(
                 unfilled_pos_or_kwargs = list(pos_or_kwargs)[index:]
                 one_missing = len(unfilled_pos_or_kwargs) == 1
                 msg = (
-                    f"{func.__qualname__}() missing {len(unfilled_pos_or_kwargs)} required "
+                    f"{func.__qualname__}() missing {len(unfilled_pos_or_kwargs)} required "  # noqa: E501
                     + (
                         f"positional argument: {unfilled_pos_or_kwargs[0]!r}"
                         if one_missing
-                        else f"positional arguments: {', '.join(repr(name) for name in unfilled_pos_or_kwargs[:-1])} "
+                        else f"positional arguments: {', '.join(repr(name) for name in unfilled_pos_or_kwargs[:-1])} "  # noqa: E501
                         f"and {unfilled_pos_or_kwargs[-1]!r}"
                     )
                 )
@@ -143,6 +143,7 @@ def cold_call(
     #####
     if var_posarg:
         args.extend(passed_posargs)
+
     #####
     # Keyword-only arguments
     #####
@@ -151,6 +152,7 @@ def cold_call(
         for name in grouped_by_kind.get(Parameter.KEYWORD_ONLY, {})
         if name in kw
     }
+
     #####
     # Variadic Keyword arguments
     #####

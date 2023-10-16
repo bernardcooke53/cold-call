@@ -43,7 +43,7 @@ repos:
     rev: v3.15.0
     hooks:
       - id: pyupgrade
-        args: [ "--py37-plus", "--keep-runtime-typing" ]
+        args: [ "--py38-plus", "--keep-runtime-typing" ]
 
   # Linters and validation
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -54,7 +54,7 @@ repos:
           - "--fix"
           - "--exit-non-zero-on-fix"
           - "--statistics"
-          - "--format=text"
+          - "--output-format=text"
           - "."
         pass_filenames: false
 
@@ -62,7 +62,7 @@ repos:
     rev: "v1.5.1"
     hooks:
       - id: mypy
-        args: ["--config-file", "pyproject.toml", "src/"]
+        args: [ "--config-file", "pyproject.toml", "src/" ]
         log_file: "mypy.log"
         files: "^src/cold_call/.*"
         pass_filenames: false
@@ -97,7 +97,7 @@ repos:
           - "--quiet"
           - "src/cold_call/"
         # Needed if using pyproject.toml for config
-        additional_dependencies: ["bandit[toml]"]
+        additional_dependencies: [ "bandit[toml]" ]
         pass_filenames: false
   # # GHA linting
   # - repo: https://github.com/python-jsonschema/check-jsonschema

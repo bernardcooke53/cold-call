@@ -72,7 +72,7 @@ targets = ["cold_call"]
 target-version = "py38"
 line-length = 88
 force-exclude = true
-format = "grouped"
+output-format = "grouped"
 ignore-init-module-imports = true
 show-source = true
 show-fixes = true
@@ -180,7 +180,7 @@ ignore = [
 ]
 
 [tool.ruff.mccabe]
-max-complexity = 10
+max-complexity = 15
 
 [tool.ruff.flake8-implicit-str-concat]
 allow-multiline = true

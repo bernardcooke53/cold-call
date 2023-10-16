@@ -10,6 +10,7 @@ from cold_call import cold_callable
 @pytest.fixture
 def testfunc():
     def test_func(arg: int) -> str:
+        del arg
         return "the result"
 
     return test_func
