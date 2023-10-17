@@ -47,6 +47,7 @@ test-cov = "coverage run -m pytest {args:tests}"
 cov-report = ["- coverage combine", "coverage report"]
 cov = ["test-cov", "cov-report"]
 pre-commit-all = "pre-commit run -a"
+all = ["cov", "pre-commit-all"]
 
 [[tool.hatch.envs.all.matrix]]
 python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
@@ -56,7 +57,7 @@ detached = true
 dependencies = ["black>=23.9.1", "mypy>=1.5.1", "ruff>=0.0.292"]
 
 [tool.hatch.envs.lint.scripts]
-typing = "mypy --install-types --non-interactive {args:src/cold_call tests}"
+typing = "mypy --cache-dir /dev/null {args:'src'}"
 style = ["ruff {args:.}", "black --check --diff {args:.}"]
 fmt = ["black {args:.}", "ruff --fix {args:.}", "style"]
 all = ["style", "typing"]
