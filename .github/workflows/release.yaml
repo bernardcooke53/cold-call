@@ -1,5 +1,5 @@
 ---
-name: Deploy misprint
+name: Deploy cold-call
 
 on:
   workflow_dispatch: {}
